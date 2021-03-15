@@ -1,25 +1,43 @@
 #!/usr/bin/env bash
 
 if [[ "$#" -eq 3 && -d "$1/.git" ]]; then
-    echo "This will squash every commit of repository \"$1\" in the active branch into one single commit, removing all history, submodules, hooks and configs in the process. The newly created repository will configure the user \"$2\" and optionally force push to remote repository \"$3\"."
+    echo "This will squash every commit of repository \"$1\" in the master branch into one single commit, removing all history, submodules, hooks and configs in the process. The newly created repository will configure the user \"$2\" and optionally force push to remote repository \"$3\"."
     read -p "Are you sure? [y/N] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         REPLY=
         pushd "$1"
-        read -p "^^-- inside here, ok?? [y/N] " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            REPLY=
-            echo "okaaay, here we go..."
-            sleep 2
-            find . -name ".git" -type d -print | while read -r line; do
-                echo "delete directory: $line"
-                rm -rf $line
+            originurl=$(git config --get remote.origin.url)
+        popd
+        mkdir -p /tmp/squashrepo
+        rm -rf /tmp/squashrepo/*
+        git clone --depth=1 "$originurl" /tmp/squashrepo/gitrepo
+        pushd /tmp/squashrepo/gitrepo
+            find . -name "PKGBUILD" -type f -print | while read -r line; do
+                srcdir=$(dirname $(readlink -f "$line"))
+                pushd "$srcdir"
+                    makepkg -co
+                    sed -i '/^source=\|^md5sums=\|^sha1sums=\|^sha256sums=/d' PKGBUILD
+                    sed -i 's/^pkgver\s*()/isalreadyversioned()/g' PKGBUILD
+                    sed -i 's/^prepare\s*()/isalreadyprepared()/g' PKGBUILD
+                popd
             done
-            find . -name ".git" -type f -print | while read -r line; do
+            find . -name ".git" -type d -print | while read -r line; do
+                if [[ -d "$line/refs" ]]; then
+                    echo "delete gitrepo: $line"
+                    rm -rf $line
+                fi
+            done
+            find . \( -name ".git*" -o -name "README.md" \) -type f -print | while read -r line; do
                 echo "delete file: $line"
                 rm -f $line
+            done
+            find . -name HEAD -type f -print | while read -r line; do
+                gitdir=$(dirname $(readlink -f "$line"))
+                if [[ -d "$gitdir/refs" ]]; then
+                    echo "delete bare gitrepo: $gitdir"
+                    rm -rf $gitdir
+                fi
             done
             git init .
             git config user.name "$2"
@@ -33,7 +51,6 @@ if [[ "$#" -eq 3 && -d "$1/.git" ]]; then
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 git push --set-upstream origin master -f
             fi
-        fi
         popd
     fi
 else
