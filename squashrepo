@@ -6,17 +6,14 @@ if [[ "$#" -eq 3 && -d "$1/.git" ]]; then
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         REPLY=
-        pushd "$1"
-            originurl=$(git config --get remote.origin.url)
-        popd
         mkdir -p /tmp/squashrepo
         rm -rf /tmp/squashrepo/*
-        git clone --depth=1 "$originurl" /tmp/squashrepo/gitrepo
+        git clone -b master "$1" /tmp/squashrepo/gitrepo
         pushd /tmp/squashrepo/gitrepo
             find . -name "PKGBUILD" -type f -print | while read -r line; do
                 srcdir=$(dirname $(readlink -f "$line"))
                 pushd "$srcdir"
-                    makepkg -co
+                    makepkg -o
                     sed -i '/^source=\|^md5sums=\|^sha1sums=\|^sha256sums=/d' PKGBUILD
                     sed -i 's/^pkgver\s*()/isalreadyversioned()/g' PKGBUILD
                     sed -i 's/^prepare\s*()/isalreadyprepared()/g' PKGBUILD
@@ -28,7 +25,7 @@ if [[ "$#" -eq 3 && -d "$1/.git" ]]; then
                     rm -rf $line
                 fi
             done
-            find . \( -name ".git*" -o -name "README.md" \) -type f -print | while read -r line; do
+            find . -name ".git*" -type f -print | while read -r line; do
                 echo "delete file: $line"
                 rm -f $line
             done
@@ -38,6 +35,11 @@ if [[ "$#" -eq 3 && -d "$1/.git" ]]; then
                     echo "delete bare gitrepo: $gitdir"
                     rm -rf $gitdir
                 fi
+            done
+            find . -name ".github" -type d -print | while read -r line; do
+                dir=$(dirname $(readlink -f "$line"))
+                echo "rename github folder: \"$line\" \"$dir/.docs\""
+                mv "$line" "$dir/.docs"
             done
             git init .
             git config user.name "$2"
