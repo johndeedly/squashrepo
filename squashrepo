@@ -41,6 +41,12 @@ if [[ "$#" -eq 3 && -d "$1/.git" ]]; then
                 echo "rename github folder: \"$line\" \"$dir/.docs\""
                 mv "$line" "$dir/.docs"
             done
+            find . -type l -print | while read -r line; do
+                link=$(readlink "$line")
+                echo "dereference symlink: \"$line\" -> \"$link\""
+                rm "$line"
+                cp -rL "$link" "$line"
+            done
             git init .
             git config user.name "$2"
             git config user.email "$2"
