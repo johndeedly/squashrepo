@@ -26,7 +26,7 @@ if [[ "$#" -eq 3 && -d "$1/.git" ]]; then
                     rm -rf $line
                 fi
             done
-            find . -name ".git*" -type f -print | while read -r line; do
+            find . \( -name ".git" -o -name ".gitmodules" \) -type f -print | while read -r line; do
                 echo "delete file: $line"
                 rm -f $line
             done
