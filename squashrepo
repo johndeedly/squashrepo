@@ -9,12 +9,13 @@ if [[ "$#" -eq 3 && -d "$1/.git" ]]; then
         mkdir -p /tmp/squashrepo
         rm -rf /tmp/squashrepo/*
         git clone -b master "$1" /tmp/squashrepo/gitrepo
+        git init --bare /tmp/squashrepo/barerepo
         pushd /tmp/squashrepo/gitrepo
             find . -name "PKGBUILD" -type f -print | while read -r line; do
                 srcdir=$(dirname $(readlink -f "$line"))
                 pushd "$srcdir"
-                    makepkg -o
-                    sed -i '/^source=\|^md5sums=\|^sha1sums=\|^sha256sums=/d' PKGBUILD
+                    makepkg -so
+                    sed -i 's/^source=\|^md5sums=\|^sha1sums=\|^sha256sums=/disabled=/g' PKGBUILD
                     sed -i 's/^pkgver\s*()/isalreadyversioned()/g' PKGBUILD
                     sed -i 's/^prepare\s*()/isalreadyprepared()/g' PKGBUILD
                 popd
@@ -41,18 +42,16 @@ if [[ "$#" -eq 3 && -d "$1/.git" ]]; then
                 echo "rename github folder: \"$line\" \"$dir/.docs\""
                 mv "$line" "$dir/.docs"
             done
-            find . -type l -print | while read -r line; do
-                link=$(readlink "$line")
-                echo "dereference symlink: \"$line\" -> \"$link\""
-                rm "$line"
-                cp -rL "$link" "$line"
-            done
             git init .
             git config user.name "$2"
             git config user.email "$2"
             git add -A
             git commit -am "squashed!"
-            git tag -a latest -m "latest commit"
+            git tag -a latest HEAD -m "latest commit"
+            git remote add origin "file:///tmp/squashrepo/barerepo"
+            git push --set-upstream origin master -f
+        popd
+        pushd /tmp/squashrepo/barerepo
             git remote add origin "$3"
             read -p "Do you want to force push to \"$3\"? [y/N] " -n 1 -r
             echo
